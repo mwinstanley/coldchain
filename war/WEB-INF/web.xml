@@ -12,6 +12,16 @@ http://java.sun.com/xml/ns/javaee/web-app_2_5.xsd" version="2.5">
 		<servlet-name>Coldchain</servlet-name>
 		<url-pattern>/coldchain</url-pattern>
 	</servlet-mapping>
+
+	<servlet>
+		<servlet-name>ColdchainInfo</servlet-name>
+		<servlet-class>edu.washington.cs.coldchain.ColdchainInfoServlet</servlet-class>
+	</servlet>
+	<servlet-mapping>
+		<servlet-name>ColdchainInfo</servlet-name>
+		<url-pattern>/coldchaininfo</url-pattern>
+	</servlet-mapping>
+
 	<welcome-file-list>
 		<welcome-file>index.html</welcome-file>
 	</welcome-file-list>

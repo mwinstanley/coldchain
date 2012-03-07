@@ -8,6 +8,10 @@ body {
     padding: 0;
 }
 
+p {
+	line-height: 0%	
+}
+
 table {
     border-spacing: 20px;
     table-layout: fixed;

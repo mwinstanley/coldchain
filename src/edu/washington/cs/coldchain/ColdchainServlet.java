@@ -3,8 +3,8 @@ package edu.washington.cs.coldchain;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Enumeration;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -16,14 +16,14 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import com.google.appengine.api.datastore.DatastoreService;
-import com.google.appengine.api.datastore.DatastoreServiceFactory;
+//import com.google.appengine.api.datastore.DatastoreService;
+//import com.google.appengine.api.datastore.DatastoreServiceFactory;
 
 public class ColdchainServlet extends HttpServlet {
     private static final long serialVersionUID = 1L;
     private static final Map<String, Facility> facilities = new LinkedHashMap<String, Facility>();
     private static final Set<String> IMPORTANT_INDICES = new HashSet<String>();
-    private static final DatastoreService DATASTORE = DatastoreServiceFactory.getDatastoreService();
+    //private static final DatastoreService DATASTORE = DatastoreServiceFactory.getDatastoreService();
 
     @Override
     public void doGet(HttpServletRequest req, HttpServletResponse resp)
@@ -87,16 +87,24 @@ public class ColdchainServlet extends HttpServlet {
                 facilities.get(line[1]).addFridge(header, line);
             }
         }
-        
+        /*
         for (Facility facility : facilities.values()) {
             DATASTORE.put(facility.getEntity());
-        }
+        }*/
 
     }
     
     @Override
-    public void doPost(HttpServletRequest req, HttpServletResponse resp) {
+    public void doPost(HttpServletRequest req, HttpServletResponse resp)
+            throws IOException {
         String[] params = req.getParameterValues("key");
         IMPORTANT_INDICES.addAll(Arrays.asList(params));
+        
+        Enumeration names = req.getParameterNames();
+        while (names.hasMoreElements()) {
+            String name = (String) names.nextElement();
+            
+        }
+        PrintWriter writer = resp.getWriter();
     }
 }

@@ -5,6 +5,7 @@ import java.util.Iterator;
 import java.util.Set;
 
 public class JSONMap<K, V> extends HashMap<K, V> {
+    private static final long serialVersionUID = 1L;
     private String toString;
     public String toString() {
         if (toString == null) {
