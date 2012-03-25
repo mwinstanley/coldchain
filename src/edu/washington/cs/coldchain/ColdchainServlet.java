@@ -12,6 +12,7 @@ import java.util.Map;
 import java.util.Scanner;
 import java.util.Set;
 
+import javax.jdo.PersistenceManager;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -100,11 +101,5 @@ public class ColdchainServlet extends HttpServlet {
         String[] params = req.getParameterValues("key");
         IMPORTANT_INDICES.addAll(Arrays.asList(params));
         
-        Enumeration names = req.getParameterNames();
-        while (names.hasMoreElements()) {
-            String name = (String) names.nextElement();
-            
-        }
-        PrintWriter writer = resp.getWriter();
     }
 }

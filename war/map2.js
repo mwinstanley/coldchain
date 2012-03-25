@@ -58,6 +58,7 @@ $(document).ready(
             setUpUI();
             requestData();
             resize();
+            alert(document.cookie);
             
             /*
             var index = 0;
