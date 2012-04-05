@@ -9,6 +9,7 @@ body {
 }
 
 p {
+    white-space:normal;
 	line-height: 0%	
 }
 
@@ -57,4 +58,48 @@ table {
 #popup-content table {
     border-spacing: 5px;
     table-layout: auto;
+}
+
+#tabs {
+	font-size: 90%;
+	margin: 20px 0;
+}
+#tabs ul {
+	float: left;
+	background: #fff;
+	width: 500px;
+	padding-top: 4px;
+}
+#tabs li {
+	margin-left: 8px;
+	list-style: none;
+}
+* html #tabs li {
+	display: inline;
+}
+#tabs li, #tabs li a {
+	float: left;
+}
+#tabs ul li.active {
+	border-top:2px #FFFF66 solid;
+	background: #FFFFCC;
+}
+#tabs ul li.active a {
+	color: #333333;
+}
+#tabs div {
+	clear: both;
+	padding: 15px;
+	min-height: 200px;
+	width: 50%;
+	border: 1px solid;
+}
+#tabs div h3 {
+	margin-bottom: 12px;
+}
+#tabs ul li a {
+	text-decoration: none;
+	padding: 8px;
+	color: #000;
+	font-weight: bold;
 }

@@ -20,34 +20,52 @@ import javax.servlet.http.HttpServletResponse;
 //import com.google.appengine.api.datastore.DatastoreService;
 //import com.google.appengine.api.datastore.DatastoreServiceFactory;
 
+/**
+ * 
+ * Operations:
+ *     GET:  return either all data or headers only
+ *     POST: 
+ *     PUT:  
+ * 
+ * @author Melissa Winstanley
+ */
 public class ColdchainServlet extends HttpServlet {
     private static final long serialVersionUID = 1L;
     private static final Map<String, Facility> facilities = new LinkedHashMap<String, Facility>();
     private static final Set<String> IMPORTANT_INDICES = new HashSet<String>();
     //private static final DatastoreService DATASTORE = DatastoreServiceFactory.getDatastoreService();
 
+    
+    /**
+     * Parameters:
+     *     file - which file to deal with
+     *     type - what type of data to return (either 'h' for headers or
+     *            'd' for all data)
+     */
     @Override
     public void doGet(HttpServletRequest req, HttpServletResponse resp)
             throws IOException {
         resp.setContentType("text/plain");
         String fileName = req.getParameter("file");
+        String type = req.getParameter("type");
         Scanner input = new Scanner(new File(fileName));
         if (facilities.isEmpty()) {
             getResponse(input);
         }
-        if (req.getParameter("k") != null) {
-            getKeys(resp.getWriter());
-        } else {
+        if (type.equals("h")) {
+            getKeys(resp.getWriter(), fileName);
+        } else if (type.equals("d")){
             printFacilities(resp.getWriter());
         }
     }
     
-    private void getKeys(PrintWriter writer) {
-        Iterator<String> keys = facilities.values().iterator().next().getKeys().iterator();
+    private void getKeys(PrintWriter writer, String file) throws IOException {
+        writer.print(new Scanner(new File(file)).nextLine());
+        /*Iterator<String> keys = facilities.values().iterator().next().getKeys().iterator();
         writer.print(keys.next());
         while (keys.hasNext()) {
             writer.print("," + keys.next());
-        }
+        }*/
     }
     
     private void printFacilities(PrintWriter writer) {
