@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import javax.jdo.PersistenceManager;
 import javax.jdo.annotations.Element;
 import javax.jdo.annotations.FetchGroup;
 import javax.jdo.annotations.IdGeneratorStrategy;
@@ -65,7 +66,7 @@ public class UserOptions {
     @Override
     public String toString() {
         JSONSerializer serializer = new JSONSerializer();
-        return serializer.exclude("*.class").include("fields").serialize(this);
+        return serializer.exclude("*.class").include("fields.values").serialize(this);
         /*
         String result = "";
         for (int i = 0; i < fields.size(); i++) {
@@ -100,6 +101,12 @@ public class UserOptions {
         }
     }
     
+    public void deleteValues(PersistenceManager pm) {
+        for (Field f : fields) {
+            f.deleteValues(pm);
+        }
+    }
+    
     /**
      * 
      * {"id": "field_id", "displayType": "DISPLAY_TYPE", "values": [{"id": "value_id", "name": "readable_name", "color": "color"}]}
@@ -110,6 +117,17 @@ public class UserOptions {
         List valuesMap = (List) new JSONDeserializer().deserialize(values);
         System.out.println(valuesMap.getClass());
         System.out.println(((Map<String, Object>)valuesMap.get(0)).get("id"));
+        int valIndex = 0;
+        for (int i = 0; i < fields.size(); i++) {
+            Map<String, Object> val = (Map<String, Object>)valuesMap.get(valIndex);
+            Field curField = fields.get(i);
+            if (curField.getId().equals(val.get("id"))) {
+                curField.setDisplay((String)val.get("displayType"), (String)val.get("inInfoBox"),
+                        (List<Map<String, String>>)val.get("values"));
+                valIndex++;
+            }
+            
+        }
     }
     
     private String separateJSON(String s) {

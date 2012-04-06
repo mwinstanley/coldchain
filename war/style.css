@@ -10,12 +10,13 @@ body {
 
 p {
     white-space:normal;
-	line-height: 0%	
+	line-height: 100%	
 }
 
 table {
-    border-spacing: 20px;
     table-layout: fixed;
+    border-collapse: collapse;
+    border-spacing: 0px;
 }
 
 #content {

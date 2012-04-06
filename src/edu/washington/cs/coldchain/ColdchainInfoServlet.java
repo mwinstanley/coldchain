@@ -79,13 +79,10 @@ public class ColdchainInfoServlet extends HttpServlet {
             
             UserOptions opt = null;
             if (type.equals("f")) {
-                opt = getUserOptions(Long.parseLong(id), true);
-                opt.reviseOptions(values);
+                updateOptionsFields(Long.parseLong(id), values, resp.getWriter());
             } else if (type.equals("v")){
-                opt = getUserOptions(Long.parseLong(id), false);
-                opt.updateValues(values);
+                updateOptionsValues(Long.parseLong(id), values, resp.getWriter());
             }
-            update(opt, req, resp);
         }
     }
     
@@ -101,6 +98,36 @@ public class ColdchainInfoServlet extends HttpServlet {
         update(opt, req, resp);
     }
     
+    private void updateOptionsFields(long id, String values, PrintWriter writer) {
+        PersistenceManager pm = PMF.get().getPersistenceManager();
+        UserOptions options = null;
+        try {
+            options = pm.getObjectById(UserOptions.class, id);
+            pm.deletePersistentAll(options.getFields());
+            options.reviseOptions(values);
+        } finally {
+            pm.close();
+            if (options != null) {
+                writer.print(options.getID());
+            }
+        }
+    }
+    
+    private void updateOptionsValues(long id, String values, PrintWriter writer) {
+        PersistenceManager pm = PMF.get().getPersistenceManager();
+        UserOptions options = null;
+        try {
+            options = pm.getObjectById(UserOptions.class, id);
+            options.deleteValues(pm);
+            options.updateValues(values);
+        } finally {
+            pm.close();
+            if (options != null) {
+                writer.print(options.getID());
+            }
+        }
+    }
+    
     private void update(UserOptions opt, HttpServletRequest req,
                         HttpServletResponse resp) throws IOException {
         PersistenceManager pm = PMF.get().getPersistenceManager();
@@ -113,15 +140,18 @@ public class ColdchainInfoServlet extends HttpServlet {
         }
     }
     
-    private UserOptions getUserOptions(long id, boolean delete) {
+    private UserOptions getUserOptions(long id, boolean deleteFields, boolean deleteValues) {
         PersistenceManager pm = PMF.get().getPersistenceManager();
         pm.getFetchPlan().addGroup("fields");
+        pm.getFetchPlan().addGroup("values");
         UserOptions options, detached = null;
         try {
             options = pm.getObjectById(UserOptions.class, id);
             detached = pm.detachCopy(options);
-            if (delete) {
+            if (deleteFields) {
                 pm.deletePersistentAll(options.getFields());
+            } else if (deleteValues) {
+                options.deleteValues(pm);
             }
         } finally {
             pm.close();

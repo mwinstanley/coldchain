@@ -1,8 +1,12 @@
 package edu.washington.cs.coldchain;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
+import javax.jdo.PersistenceManager;
 import javax.jdo.annotations.Element;
+import javax.jdo.annotations.FetchGroup;
 import javax.jdo.annotations.IdGeneratorStrategy;
 import javax.jdo.annotations.PersistenceCapable;
 import javax.jdo.annotations.Persistent;
@@ -20,7 +24,8 @@ import flexjson.JSONSerializer;
  *
  * @author Melissa Winstanley
  */
-@PersistenceCapable
+@PersistenceCapable(detachable="true")
+@FetchGroup(name="values", members={@Persistent(name="values"),@Persistent(name="displayType")})
 public class Field {
     /** The ID assigned to this field in the original data set. */
     @Persistent
@@ -36,7 +41,11 @@ public class Field {
     
     /** How to display the data, map/filter/size. */
     @Persistent
-    private String displayType;
+    private DisplayType displayType;
+    
+    /** Whether to represent this field's data in the info box. */
+    @Persistent
+    private boolean inInfoBox;
     
     /** All possible values for discrete types of data. */
     @Element(dependent = "true")
@@ -72,11 +81,15 @@ public class Field {
     }
 
     public String getDisplayType() {
-        return displayType;
+        return displayType != null ? displayType.toString() : "";
     }
 
     public void setDisplayType(String displayType) {
-        this.displayType = displayType;
+        this.displayType = DisplayType.valueOf(displayType);
+    }
+    
+    public boolean getInInfoBox() {
+        return inInfoBox;
     }
 
     public List<Value> getValues() {
@@ -99,6 +112,11 @@ public class Field {
         this.name = name;
     }
     
+    public void deleteValues(PersistenceManager pm) {
+        pm.deletePersistentAll(values);
+        values = null;
+    }
+    
     /**
      * Sets the display properties of this field. Display properties consist of
      * a specific display type and a list of possible values (for mapping or
@@ -111,11 +129,20 @@ public class Field {
      * @param options a JSON-formatted array of values (value consists of
      *                id, name, color) 
      */
-    public void setDisplay(String display, String options) {
-        this.displayType = (display.toUpperCase());
-        if (displayType != "SIZE") {
-            JSONDeserializer<List<Value>> deserializer = new JSONDeserializer<List<Value>>();
-            values = deserializer.deserialize(options, Value.class);
+    public void setDisplay(String display, String inInfoBox, List<Map<String, String>> options) {
+        this.displayType = DisplayType.valueOf(display.toUpperCase());
+        this.inInfoBox = inInfoBox.equals("true");
+        if ((displayType == DisplayType.MAP || displayType == DisplayType.FILTER ) && options != null) {
+            values = new ArrayList<Value>();
+            for (Map<String, String> option : options) {
+                Value val = new Value();
+                val.id = option.get("id");
+                val.name = option.get("name");
+                if (displayType == DisplayType.MAP) {
+                    val.color = option.get("color");
+                }
+                values.add(val);
+            }
         }
     }
     
@@ -157,6 +184,7 @@ public class Field {
         private String name;
         @Persistent
         private String color;
+
         
         @PrimaryKey       @Persistent(valueStrategy = 
                 IdGeneratorStrategy.IDENTITY) 

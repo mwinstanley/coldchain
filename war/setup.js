@@ -50,12 +50,18 @@ function requestUserOptions(headers) {
 }
 
 function setUpTable(header, userOptions) {
+    $table = $('<table>');
+    $thead = $('<thead>');
     $tr = $('<tr>');
     $('<th>').append('Field name').appendTo($tr);
     $('<th>').append('Rename field').appendTo($tr);
     $('<th>').append('Include in map?').appendTo($tr);
     $('<th>').append('Type of field').appendTo($tr);
-    $('#checkboxes').append($tr);
+    
+    $thead.append($tr);
+    $table.append($thead);
+    
+    $tbody = $('<tbody>');
     var header = header.split(',');
     console.log('useroptions = ' + userOptions);
     var options = userOptions ? JSON.parse(userOptions) : null;
@@ -93,19 +99,19 @@ function setUpTable(header, userOptions) {
         });
         $select.val(found ? fields[num]["fieldType"] : 0);
         $('<td>').append($select).appendTo($tr);
-        $('#checkboxes').append($tr);
+        $tbody.append($tr);
         if (found) {
             num++;
         }
     }
-    $tr = $('<tr>');
+    $table.append($tbody);
+    $('#checkboxes').append($table);
     $button = makeSubmitButtonFields('Submit', null);
-    $('<td>').append($button).appendTo($tr);
+    $('#checkboxes').append($button);
     if (options != null) {
         $buttonUpdate = makeSubmitButtonFields('Update', true);
-        $('<td>').append($buttonUpdate).appendTo($tr);
+        $('#checkboxes').append($buttonUpdate);
     }
-    $('#checkboxes').append($tr);
 }
 
 function makeSubmitButtonFields(text, id) {
@@ -116,7 +122,7 @@ function makeSubmitButtonFields(text, id) {
         'class': 'btn',
     });
     $button.click(function() {
-        var table = $('#checkboxes tr').map(function() {
+        var table = $('#checkboxes tbody tr').map(function() {
             var $row = $(this);
             var res;
             if ($row.find(':nth-child(3)').find('input').is(':checked')) {
@@ -147,13 +153,14 @@ function makeSubmitButtonValues() {
         'class': 'btn',
     });
     $button.click(function() {
-        var table = $('#tab-2 tr').map(function() {
+        var table = $('#tab-2 tbody tr').map(function() {
             var $row = $(this);
             var res = {id: $row.find(':nth-child(1)').find('p').text(),
-                       displayType: $row.find(':nth-child(3)').find('select').val(),
-                       values: $row.find(':nth-child(4)').find('input').val(),
-                       names: $row.find(':nth-child(5)').find('input').val(),
-                       colors: $row.find(':nth-child(6)').find('input').val()
+                       displayType: $row.find(':nth-child(4)').find('select').val(),
+                       values: $row.find(':nth-child(5)').find('input').val(),
+                       names: $row.find(':nth-child(6)').find('input').val(),
+                       colors: $row.find(':nth-child(7)').find('input').val(),
+                       inInfoBox: $row.find(':nth-child(3)').find('input').is(':checked') ? 'true' : 'false'
             };
             return res;
         });
@@ -173,14 +180,14 @@ function addCell(value) {
 function makeValuesData(table, id) {
     console.log(table);
     var res = 'data=[';
-    // omit index 0 - which is the header
-    for (var i = 1; i < table.length; i++) {
+    for (var i = 0; i < table.length; i++) {
         // DEAL W/COMMAS IN USER-ENTERED FIELD
-        if (i != 1) {
+        if (i != 0) {
             res += ', ';
         }
         res += '{ "id": "' + table[i].id + '", ' +
-                 '"displayType": "' + table[i].displayType + '"';
+                 '"displayType": "' + table[i].displayType + '", ' +
+                 '"inInfoBox": "' + table[i].inInfoBox + '"';
         var valSplit = table[i].values != undefined && table[i].values.length != 0 ?
                             table[i].values.split(',') : null;
         var colSplit = table[i].colors != undefined && table[i].colors.length != 0 ?
@@ -251,18 +258,24 @@ function makeRequest(table, update) {
 
 function setUpValueSelectors(userOptions) {
     // set up headers
-    $('#tab-2').append('<p>Select how to display your data. Colors are only applicable for mapping data. Possible ' +
+    $('#instructions').append('<p>Select how to display your data. Colors are only applicable for mapping data. Possible ' +
                         'colors are blue, green, orange, red, white, and yellow.</p>');
+    
+    $table = $('<table>');
+    $thead = $('<thead>');
     
     $tr = $('<tr>');
     $('<th>').append('Field name').appendTo($tr);
     $('<th>').append('Type of field').appendTo($tr);
+    $('<th>').append('Include in facility info box').appendTo($tr);
     $('<th>').append('Display type of field').appendTo($tr);
     $('<th>').append('Possible values (comma separated)').appendTo($tr);
     $('<th>').append('Names of values (comma separated, in order)').appendTo($tr);
     $('<th>').append('Value colors (comma separated, in order)').appendTo($tr);
-    $('#tab-2').append($tr);
+    $thead.append($tr);
+    $table.append($thead);
     
+    $tbody = $('<tbody>');
     var options = userOptions ? JSON.parse(userOptions) : null;
     var fields = options == null ? null : options["fields"];
     for (var i = 0; i < fields.length; i++) {
@@ -273,16 +286,24 @@ function setUpValueSelectors(userOptions) {
         
         $('<td>').append('<p>' + fields[i]["fieldType"] + '</p>').appendTo($tr);
         
+        $checkbox =  $('<input>', {
+            type: 'checkbox',
+            val: 'show_in_box',
+            name: 'show_in_box',
+            'class': 'check'
+        });
+        $('<td>').append($checkbox).appendTo($tr);
+        
         $select = $('<select>', {
             name: 'display_type'
         });
-        var typeOptions = ['Map', 'Filter', 'Size', 'None'];
+        var typeOptions = ['None', 'Map', 'Filter', 'Size', 'UTMLat', 'UTMLon'];
         $.each(typeOptions, function(val, text) {
             $select.append(
                     $('<option></option>').val(text.toUpperCase()).html(text)
             );
         });
-        $select.val('MAP');
+        $select.val('NONE');
         $('<td>').append($select).appendTo($tr);
         
         $('<td>').append( $('<input>', {
@@ -306,9 +327,11 @@ function setUpValueSelectors(userOptions) {
             'class': 'text'
         })).appendTo($tr);
         
-        $('#tab-2').append($tr);
+        $tbody.append($tr);
         console.log('Appended another row to value tab');
     }
+    $table.append($tbody);
+    $('#tab-2').append($table);
     $button = makeSubmitButtonValues();
     $('#tab-2').append($button);
 }
