@@ -13,21 +13,26 @@ $(document).ready(function() {
         $(currentTab).show();
         return false;
     });
-    requestHeader();
+    
+    requestUserOptions();
 });
 
-function requestHeader() {
+function requestHeader(userOptions, id) {
     $.ajax({
         type: 'GET',
         url: '/coldchain',
-        data: 'file=TBL_FACILITIES.csv&type=h',
+        data: 'type=h&' + id,
         success: function(responseText) {
-            requestUserOptions(responseText);
+            console.log(userOptions);
+            var options = userOptions ? JSON.parse(userOptions) : null;
+            setUpFileTab(options);
+            setUpTable(responseText, options);
+            setUpValueSelectors(options);
         }
     });
 }
     
-function requestUserOptions(headers) {
+function requestUserOptions() {
     var urlVars = getUrlVars();
     var id = null;
     if (urlVars['id'] && urlVars['id'].match(/^\d+$/)) {
@@ -40,19 +45,67 @@ function requestUserOptions(headers) {
             url: '/coldchaininfo',
             data: id,
             success: function(responseText) {
-                setUpTable(headers, responseText);
-                setUpValueSelectors(responseText);
+                requestHeader(responseText, id);
             }
         });
     } else {
-        setUpTable(headers, null)
+        setUpFileTab(null);
     }
 }
 
-function setUpTable(header, userOptions) {
-    $table = $('<table>');
-    $thead = $('<thead>');
-    $tr = $('<tr>');
+
+//--------------- TAB SET UP -------------------------
+function setUpFileTab(options) {
+    var $table = $('<table>');
+    var $thead = $('<thead>');
+    var $tr = $('<tr>');
+    $('<th>').append('Type of file').appendTo($tr);
+    $('<th>').append('File name').appendTo($tr);
+    $('<th>').append('Join on this column from the main file').appendTo($tr);
+    $('<th>').append('Join on this column from the secondary file').appendTo($tr);
+    
+    $thead.append($tr);
+    $table.append($thead);
+    
+    var $tbody = $('<tbody>');
+    var hasData = options != null;
+    var fileTypes = ['Main facility data', 'Refrigerator data', 'Schedule data'];
+    for (var i = 0; i < fileTypes.length; i++) {
+        $tr = $('<tr>');
+        $('<td>').append('<p>' + fileTypes[i] + '</p>').appendTo($tr);
+        $('<td>').append( $('<input>', {
+            type: 'text',
+            val: hasData ? options.files[i].name : '',
+            'class': 'text'
+        })).appendTo($tr);
+        if (i != 0) {
+            $('<td>').append( $('<input>', {
+                type: 'text',
+                val: hasData ? options.files[i].main : '',
+                    'class': 'text'
+            })).appendTo($tr);
+            $('<td>').append( $('<input>', {
+                type: 'text',
+                val: hasData ? options.files[i].secondary : '',
+                        'class': 'text'
+            })).appendTo($tr);
+        }
+        $tbody.append($tr);
+    }
+    $table.append($tbody);
+    $('#files').append($table);
+    var $button = makeSubmitButtonFiles('Submit', false);
+    $('#files').append($button);
+    if (options != null) {
+        var $buttonUpdate = makeSubmitButtonFiles('Update', true);
+        $('#files').append($buttonUpdate);
+    }
+}
+
+function setUpTable(header, options) {
+    var $table = $('<table>');
+    var $thead = $('<thead>');
+    var $tr = $('<tr>');
     $('<th>').append('Field name').appendTo($tr);
     $('<th>').append('Rename field').appendTo($tr);
     $('<th>').append('Include in map?').appendTo($tr);
@@ -61,10 +114,8 @@ function setUpTable(header, userOptions) {
     $thead.append($tr);
     $table.append($thead);
     
-    $tbody = $('<tbody>');
+    var $tbody = $('<tbody>');
     var header = header.split(',');
-    console.log('useroptions = ' + userOptions);
-    var options = userOptions ? JSON.parse(userOptions) : null;
     var fields = options == null ? null : options["fields"];
     var num = 0;
     for (var i = 0; i < header.length; i++) {
@@ -77,7 +128,7 @@ function setUpTable(header, userOptions) {
             name: header[i],
             'class': 'text'
         })).appendTo($tr);
-        $checkbox =  $('<input>', {
+        var $checkbox =  $('<input>', {
             type: 'checkbox',
             val: found ? fields[num]["name"] : header[i],
             name: header[i],
@@ -88,7 +139,7 @@ function setUpTable(header, userOptions) {
             updateButton = true;
         }
         $('<td>').append($checkbox).appendTo($tr);
-        $select = $('<select>', {
+        var $select = $('<select>', {
             name: header[i] + '_type'
         });
         var typeOptions = ['Discrete', 'Continuous', 'Unique', 'String'];
@@ -105,24 +156,151 @@ function setUpTable(header, userOptions) {
         }
     }
     $table.append($tbody);
-    $('#checkboxes').append($table);
-    $button = makeSubmitButtonFields('Submit', null);
-    $('#checkboxes').append($button);
+    $('#fields').append($table);
+    var $button = makeSubmitButtonFields('Submit', null);
+    $('#fields').append($button);
     if (options != null) {
-        $buttonUpdate = makeSubmitButtonFields('Update', true);
-        $('#checkboxes').append($buttonUpdate);
+        var $buttonUpdate = makeSubmitButtonFields('Update', true);
+        $('#fields').append($buttonUpdate);
     }
 }
 
-function makeSubmitButtonFields(text, id) {
-    $button =  $('<input>', {
+function setUpValueSelectors(options) {
+    // set up headers
+    $('#instructions').append('<p>Select how to display your data. Colors are only applicable for mapping data. Possible ' +
+                        'colors are blue, green, orange, red, white, and yellow.</p>');
+    
+    var $table = $('<table>');
+    var $thead = $('<thead>');
+    
+    var $tr = $('<tr>');
+    $('<th>').append('Field name').appendTo($tr);
+    $('<th>').append('Type of field').appendTo($tr);
+    $('<th>').append('Include in facility info box').appendTo($tr);
+    $('<th>').append('Display type of field').appendTo($tr);
+    $('<th>').append('Possible values (comma separated)').appendTo($tr);
+    $('<th>').append('Names of values (comma separated, in order)').appendTo($tr);
+    $('<th>').append('Value colors (comma separated, in order)').appendTo($tr);
+    $thead.append($tr);
+    $table.append($thead);
+    
+    var $tbody = $('<tbody>');
+    var fields = options == null ? null : options["fields"];
+    if (fields == null) {
+        return;
+    }
+    for (var i = 0; i < fields.length; i++) {
+        
+        //var found = fields != null && num < fields.length && fields[num]["id"] == header[i];
+        $tr = $('<tr>');
+        $('<td>').append('<p>' + fields[i]['id'] + '</p>').appendTo($tr);
+        
+        $('<td>').append('<p>' + fields[i]['fieldType'] + '</p>').appendTo($tr);
+        
+        var $checkbox =  $('<input>', {
+            type: 'checkbox',
+            val: 'show_in_box',
+            name: 'show_in_box',
+            'class': 'check'
+        });
+        if (fields[i].inInfoBox) {
+            $checkbox.attr('checked','checked');
+        }
+        $('<td>').append($checkbox).appendTo($tr);
+        
+        var $select = $('<select>', {
+            name: 'display_type'
+        });
+        var typeOptions = ['None', 'Map', 'Filter', 'Size', 'UTMLat', 'UTMLon'];
+        $.each(typeOptions, function(val, text) {
+            $select.append(
+                    $('<option></option>').val(text.toUpperCase()).html(text)
+            );
+        });
+        $select.val('NONE');
+        if (fields[i].displayType) {
+            $select.val(fields[i].displayType);
+        }
+        $('<td>').append($select).appendTo($tr);
+        
+        var colors = '';
+        var ids = '';
+        var names = '';
+        for (j = 0; j < fields[i].values.length; j++) {
+            if (j != 0) {
+                names += ',';
+                ids += ',';
+            }
+            var vals = fields[i].values[j];
+            if (vals.color) {
+                colors += (j != 0 ? ',' : '') + vals.color;
+            }
+            ids += vals.id;
+            names += vals.name;
+        }
+        
+        
+        $('<td>').append( $('<input>', {
+            type: 'text',
+            val: ids,
+            name: fields[i]['id'] + '_id',
+            'class': 'text'
+        })).appendTo($tr);
+        
+        $('<td>').append( $('<input>', {
+            type: 'text',
+            val: names,
+            name: fields[i]['id'] + '_name',
+            'class': 'text'
+        })).appendTo($tr);
+        
+        $('<td>').append( $('<input>', {
+            type: 'text',
+            val: colors,
+            name: fields[i]['id'] + '_color',
+            'class': 'text'
+        })).appendTo($tr);
+        
+        $tbody.append($tr);
+        console.log('Appended another row to value tab');
+    }
+    $table.append($tbody);
+    $('#values').append($table);
+    var $button = makeSubmitButtonValues();
+    $('#values').append($button);
+}
+
+function makeSubmitButtonFiles(text, id) {
+    var $button =  $('<input>', {
         type: 'button',
         val: text,
         name: text,
         'class': 'btn',
     });
     $button.click(function() {
-        var table = $('#checkboxes tbody tr').map(function() {
+        var table = $('#files tbody tr').map(function() {
+            var $row = $(this);
+            var res = {file: $row.find(':nth-child(2)').find('input').val(),
+                       joinMain: $row.find(':nth-child(3)').find('input').val(),
+                       joinSecondary: $row.find(':nth-child(4)').find('input').val()
+                 };
+            return res;
+        });
+        var cookieID = id ? getCookie('id') : null;
+        makeRequest(makeFileData(table, cookieID), id);
+    });
+    return $button;
+}
+
+function makeSubmitButtonFields(text, id) {
+    var $button =  $('<input>', {
+        type: 'button',
+        val: text,
+        name: text,
+        'class': 'btn',
+    });
+    $button.click(function() {
+        var table = $('#fields tbody tr').map(function() {
             var $row = $(this);
             var res;
             if ($row.find(':nth-child(3)').find('input').is(':checked')) {
@@ -146,14 +324,14 @@ function makeSubmitButtonFields(text, id) {
 }
 
 function makeSubmitButtonValues() {
-    $button =  $('<input>', {
+    var $button =  $('<input>', {
         type: 'button',
         val: 'Update Values',
         name: 'update-values',
         'class': 'btn',
     });
     $button.click(function() {
-        var table = $('#tab-2 tbody tr').map(function() {
+        var table = $('#values tbody tr').map(function() {
             var $row = $(this);
             var res = {id: $row.find(':nth-child(1)').find('p').text(),
                        displayType: $row.find(':nth-child(4)').find('select').val(),
@@ -173,8 +351,27 @@ function makeSubmitButtonValues() {
 }
 
 function addCell(value) {
-    $('#checkboxes').append($('<td>')).append(value);
-    //$('#checkboxes').append('</td>');
+    $('#fields').append($('<td>')).append(value);
+    //$('#fields').append('</td>');
+}
+
+function makeFileData(table, id) {
+    console.log(table);
+    var res = 'data=[';
+    for (var i = 0; i < table.length; i++) {
+        if (i != 0) {
+            res += ', ';
+        }
+        res += '{ "file": "' + table[i].file + '", ' +
+               '"joinMain": "' + table[i].joinMain + '", ' +
+               '"joinSecondary": "' + table[i].joinSecondary + '" }';
+    }
+    res += ']';
+    if (id != null) {
+        res = 'id=' + id + "&" + res;
+    }
+    res = 'type=s&' + res;
+    return res;
 }
 
 function makeValuesData(table, id) {
@@ -245,7 +442,7 @@ function makeRequest(table, update) {
                 $tr = $('<tr>');
                 $button = makeSubmitButtonFields('Update', getCookie('id'));
                 $('<td>').append($button).appendTo($tr);
-                $('#checkboxes').append($tr);
+                $('#fields').append($tr);
             }
             $('#your_id').empty();
             $('#your_id').append('<p>Your user ID is ' + responseText + '</p>');
@@ -254,113 +451,4 @@ function makeRequest(table, update) {
             scrollTo(0,0);
         }
     });
-}
-
-function setUpValueSelectors(userOptions) {
-    // set up headers
-    $('#instructions').append('<p>Select how to display your data. Colors are only applicable for mapping data. Possible ' +
-                        'colors are blue, green, orange, red, white, and yellow.</p>');
-    
-    $table = $('<table>');
-    $thead = $('<thead>');
-    
-    $tr = $('<tr>');
-    $('<th>').append('Field name').appendTo($tr);
-    $('<th>').append('Type of field').appendTo($tr);
-    $('<th>').append('Include in facility info box').appendTo($tr);
-    $('<th>').append('Display type of field').appendTo($tr);
-    $('<th>').append('Possible values (comma separated)').appendTo($tr);
-    $('<th>').append('Names of values (comma separated, in order)').appendTo($tr);
-    $('<th>').append('Value colors (comma separated, in order)').appendTo($tr);
-    $thead.append($tr);
-    $table.append($thead);
-    
-    $tbody = $('<tbody>');
-    var options = userOptions ? JSON.parse(userOptions) : null;
-    var fields = options == null ? null : options["fields"];
-    for (var i = 0; i < fields.length; i++) {
-        
-        //var found = fields != null && num < fields.length && fields[num]["id"] == header[i];
-        $tr = $('<tr>');
-        $('<td>').append('<p>' + fields[i]["id"] + '</p>').appendTo($tr);
-        
-        $('<td>').append('<p>' + fields[i]["fieldType"] + '</p>').appendTo($tr);
-        
-        $checkbox =  $('<input>', {
-            type: 'checkbox',
-            val: 'show_in_box',
-            name: 'show_in_box',
-            'class': 'check'
-        });
-        $('<td>').append($checkbox).appendTo($tr);
-        
-        $select = $('<select>', {
-            name: 'display_type'
-        });
-        var typeOptions = ['None', 'Map', 'Filter', 'Size', 'UTMLat', 'UTMLon'];
-        $.each(typeOptions, function(val, text) {
-            $select.append(
-                    $('<option></option>').val(text.toUpperCase()).html(text)
-            );
-        });
-        $select.val('NONE');
-        $('<td>').append($select).appendTo($tr);
-        
-        $('<td>').append( $('<input>', {
-            type: 'text',
-            val: 'enter here',
-            name: fields[i]['id'] + '_id',
-            'class': 'text'
-        })).appendTo($tr);
-        
-        $('<td>').append( $('<input>', {
-            type: 'text',
-            val: 'enter here',
-            name: fields[i]['id'] + '_name',
-            'class': 'text'
-        })).appendTo($tr);
-        
-        $('<td>').append( $('<input>', {
-            type: 'text',
-            val: 'enter here',
-            name: fields[i]['id'] + '_color',
-            'class': 'text'
-        })).appendTo($tr);
-        
-        $tbody.append($tr);
-        console.log('Appended another row to value tab');
-    }
-    $table.append($tbody);
-    $('#tab-2').append($table);
-    $button = makeSubmitButtonValues();
-    $('#tab-2').append($button);
-}
-
-//Read a page's GET URL variables and return them as an associative array.
-function getUrlVars()
-{
-    var vars = [], hash;
-    var hashes = window.location.href.slice(window.location.href.indexOf('?') + 1).split('&');
-    for(var i = 0; i < hashes.length; i++)
-    {
-        hash = hashes[i].split('=');
-        vars.push(hash[0]);
-        vars[hash[0]] = hash[1];
-    }
-    return vars;
-}
-
-function getCookie(c_name)
-{
-var i,x,y,ARRcookies=document.cookie.split(";");
-for (i=0;i<ARRcookies.length;i++)
-{
-  x=ARRcookies[i].substr(0,ARRcookies[i].indexOf("="));
-  y=ARRcookies[i].substr(ARRcookies[i].indexOf("=")+1);
-  x=x.replace(/^\s+|\s+$/g,"");
-  if (x==c_name)
-    {
-    return unescape(y);
-    }
-  }
 }

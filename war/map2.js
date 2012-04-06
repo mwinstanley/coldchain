@@ -13,6 +13,8 @@ var markers = [];
 // The pop-up window to be displayed on the map.
 var infoWindow;
 
+var userOptions;
+
 // User-selected display options. By default, display considering population.
 var selections = { 'considerPop' : true };
 
@@ -61,12 +63,7 @@ var facilityTypes = {
  */
 $(document).ready(
         function() {
-            getKeys();
-            setRequestedFields();
-            setUpUI();
             requestData();
-            resize();
-            alert(document.cookie);
             
             /*
             var index = 0;
@@ -120,65 +117,89 @@ $(document).ready(
             // });*/
         });
 
-/*
- * Sends a POST request to the server specifying which fields of the database are
- * of interest to the mapping process.
- */
-function setRequestedFields() {
-    var dataParams = "key=fn_latitude&key=fn_longitude&key=ft_facility_code&" +
-                     "key=fridges&key=fi_electricity&key=fi_kerosene&key=fi_bottled_gas&" +
-                     "key=ft_facility_type&key=ft_level2&key=fn_stock_outs&key=ft_facility_name&" +
-                     "key=fi_tot_pop&key=base_schedule&key=pcv_schedule&key=rota_schedule";
-    $.ajax({
-        type: "POST",
-        url: "/coldchain",
-        data: dataParams,
-        success: function(responseText) {
-        }
-    });
-}
-
 function requestData() {
     $.ajax({
         type: "GET",
         url: "/coldchain",
-        data: "file=TBL_FACILITIES.csv",
+        data: "type=d&id=" + getCookie('id'),
         success: function(responseText) {
-            data = JSON.parse(responseText);
+            console.log(responseText);
+            var json = JSON.parse(responseText);
+            userOptions = json.options;
+            parseUserOptions(userOptions);
+            var data = json.facilities;
             for (var i = 0; i < data.length; i++) {
-                var lat = data[i]['fn_latitude'];
-                var lon = data[i]['fn_longitude'];
-                if (lat.length > 0 && lon.length > 0) {
+                var lat = data[i][userOptions.lat];
+                var lon = data[i][userOptions.lon];
+                if (parseFloat(lon) < 32) {
+                    console.log("ERROR");
+                }
+                if (lat != null && lon != null) {
                     addMarker(new google.maps.LatLng(parseFloat(lat), parseFloat(lon)), data[i]);
                 }
             }
-            showCategory('fi_electricity');
+            setUpUI();
+            resize();
+            showCategory(selections.category);
         }
     });
 }
 
-/*
- * Performs an AJAX request to get all keys of interest.
- */
-function getKeys() {
-    $.ajax({
-        type: "GET",
-        url: "/coldchain",
-        data: "file=TBL_FACILITIES.csv&k=y",
-        success: function(responseText) {
+function parseUserOptions(options) {
+    options.map = [];
+    options.filter = [];
+    options.infoBox = [];
+    options.size = [];
+    for (var i = 0; i < options.fields.length; i++) {
+        var field = options.fields[i];
+        var id = field.id;
+        var display = field.displayType;
+        if (display == 'MAP') {
+            options.map.push(id);
+        } else if (display == 'FILTER') {
+            options.filter.push(id);
+        } else if (display == 'SIZE') {
+            options.size.push(id);
+        } else if (display == 'UTMLAT') {
+            options.lat = id;
+        } else if (display == 'UTMLON') {
+            options.lon = id;
         }
-    });
+        if (field.inInfoBox) {
+            console.log('Adding ' + id + ' to info box');
+            options.infoBox.push(id);
+        }
+        var vals = {};
+        for (var j = 0; j < field.values.length; j++) {
+            var val = field.values[j];
+            vals[val.id] = val;
+        }
+        field.values = vals;
+        options[id] = field;
+    }
+    options.fields = null;
 }
 
-function addDropBoxOptions(box, options, func) {
+function addElement(element, name) {
+    $tr = $('<tr>');
+    $('<td>').append('<p>' + name + '</p>').append(element).appendTo($tr);
+    $('#nav-bar table').append($tr);
+}
+
+function addDropBoxOptions(box, id, options, func) {
+    var $select = $('<select>', {
+        name: box
+    });
     $.each(options, function(val, text) {
-        $(box).append(
+        $select.append(
                 $('<option></option>').val(val).html(text)
         );
     });
-    $(box).change(function() {
-        func($(box).val());
+    $select.change(function() {
+        console.log($select.val());
+        func(id, $select.val());
     });
+    addElement($select, box);
 }
 
 function showCategory(category) {
@@ -192,12 +213,38 @@ function showCategory(category) {
             } else if (category == 'surplus') {
                 setImage(marker, marker.info[category], category);
             } else {
-                setImage(marker, parseInt(marker.info[category]), category);
+                setImage(marker, marker.info[category], category);
             }
-            marker.setMap(thisMap);
+            marker.setMap(map);
         }
     }
     showKey(category);
+}
+
+function applyFilter(filter, value) {
+    console.log('filter = ' + filter + ', value = ' + value);
+    selections[filter] = value;
+    if (markers) {
+        for (m in markers) {
+            var marker = markers[m];
+            var include = value == '' || marker.info[filter] == value;
+            for (var i = 0; i < userOptions.filter.length; i++) {
+                var curFilter = userOptions.filter[i];
+                include = include && (selections[curFilter] == null ||
+                                      selections[curFilter].length == 0 ||
+                                      marker.info[curFilter] == selections[curFilter]);
+            }
+            if (include) {
+                marker.setMap(map);
+            } else {
+                marker.setMap(null);
+            }
+        }
+    }
+}
+
+function alterSize(sizing, field) {
+    
 }
 
 function mapData(category) {
@@ -269,6 +316,8 @@ function showSchedule(schedule) {
  */
 function setUpUI() {
     // Set up the map
+    
+    // TODO: Allow changes to center of map.
     var latlng = new google.maps.LatLng(-13.15, 34.4);
     var myOptions = {
         zoom : 7,
@@ -281,23 +330,33 @@ function setUpUI() {
         showCategory(selections.category);
     });
 
-    // Set up categories
-    var categories = {
-        'fi_electricity' : 'Electricity',
-        'fi_bottled_gas' : 'Bottled gas',
-        'fi_kerosene' : 'Kerosene',
-        'fn_stock_outs' : 'Stock outs',
-        'surplus' : 'Surplus',
-        'pie' : 'Pie charts'
-    };
-    addDropBoxOptions('#selector', categories, function(category) {
+    // Set up mapping.
+    var categories = {};
+    for (var i = 0; i < userOptions.map.length; i++) {
+        var mapCategory = userOptions.map[i];
+        if (!selections.category) {
+            selections.category = mapCategory;
+        }
+        console.log(userOptions);
+        categories[mapCategory] = userOptions[mapCategory].name;
+    }
+    addDropBoxOptions('Category', 'category', categories, function(type, category) {
         showCategory(category);
         showKey(category);
     });
-    selections.category = 'fi_electricity';
 
-    // Set up facility types
-    var types2 = {
+    // Set up filters.
+    for (var i = 0; i < userOptions.filter.length; i++) {
+        var filter = userOptions.filter[i];
+        var name = userOptions[filter].name;
+        var types = {'': 'None'};
+        for (v in userOptions[filter].values) {
+            types[v] = userOptions[filter].values[v].name;
+        }
+        addDropBoxOptions(name, filter, types, applyFilter);
+    }
+    
+    /*var types2 = {
             'all' : 'All',
             'national-regional' : 'National/Regional',
             'district' : 'District',
@@ -306,36 +365,48 @@ function setUpUI() {
             'other' : 'Other'
     };
     addDropBoxOptions('#facility-type', types2, showTypes);
-
+*/
     // Set up regions
-    var regions = {
-            'ALL' : 'All',
-            'NORTH' : 'North',
-            'CENTRAL' : 'Central',
-            'SOUTH' : 'South',
-    };
-    selections.regions = 'ALL';
-    addDropBoxOptions('#region', regions, showOneRegion);
+  
+  //  addDropBoxOptions('#region', regions, showOneRegion);
 
-    // Set up population-ignore button
-    $('#ignore-size').click(function() {
-        if (selections.considerPop) {
-            $('#ignore-size').html('Consider population');
-        } else {
-            $('#ignore-size').html('Ignore population');
+    // Set up size options
+    var sizes = {};
+    for (var i = 0; i < userOptions.size.length; i++) {
+        var size = userOptions.size[i];
+        if (!selections.size) {
+            selections.size = size;
         }
-        selections.considerPop = !selections.considerPop;
+        sizes[size] = userOptions[size].name;
+    }
+    addDropBoxOptions('Size', 'size', sizes, alterSize);
+    
+    $button =  $('<input>', {
+        type: 'button',
+        val: 'Consider Size',
+        name: 'update-size',
+        'class': 'btn',
+    });
+    $button.click(function() {
+        if (selections.considerSize) {
+            $button.html('Consider size');
+        } else {
+            $button.html('Ignore size');
+        }
+        selections.considerSize = !selections.considerSize;
         showCategory(selections.category);
     });
+    addElement($button, 'Sizing');
+    
 
     // Set up vaccine schedules
-    var schedule = {
+    /*var schedule = {
         'base_schedule' : 'Base',
         'pcv_schedule' : 'Pneumo.',
         'rota_schedule' : 'Pneumo. + Rota'
     };
     selections.schedule = 'base_schedule';
-    addDropBoxOptions('#schedule', schedule, showSchedule);
+    addDropBoxOptions('#schedule', schedule, showSchedule);*/
 }
 
 // ------------------ KEY ----------------------------------------
@@ -343,52 +414,14 @@ function setUpUI() {
  * Display the key based on the current type of information being displayed.
  */
 function showKey(type) {
-    var panelText = '';
-    var green = '<img src="images/green.png" width="15px" height="15px"/>';
-    var orange = '<img src="images/orange.png" width="15px" height="15px"/>';
-    var red = '<img src="images/red.png" width="15px" height="15px"/>';
-    var yellow = '<img src="images/yellow.png" width="15px" height="15px"/>';
-    var white = '<img src="images/white.png" width="15px" height="15px"/>';
-    var blue = '<img src="images/blue.png" width="15px" height="15px"/>';
-    if (type == 'fi_kerosene') {
-        panelText = '<table><tr><td>(KEY) Kerosene:</td><td>' + green + ' '
-                + keroseneCodes[1][0] + '</td><td>' + yellow + ' '
-                + keroseneCodes[2][0] + '</td><td>' + red + ' '
-                + keroseneCodes[3][0] + '</td><td>' + white + ' '
-                + keroseneCodes[4][0] + '</td></tr></table>';
-    } else if (type == 'fi_bottled_gas') {
-        panelText = '<table><tr><td>(KEY) Gas:</td><td>' + green + ' '
-                + gasCodes[1][0] + '</td><td>' + yellow + ' ' + gasCodes[2][0]
-                + '</td><td>' + red + ' ' + gasCodes[3][0] + '</td><td>'
-                + white + ' ' + gasCodes[4][0] + '</td></tr></table>';
-    } else if (type == 'fi_electricity') {
-        panelText = '<table><tr><td>(KEY) Electricity:</td><td>' + red + ' '
-                + electricityCodes[0][0] + '</td><td>' + orange + ' '
-                + electricityCodes[1][0] + '</td><td>' + yellow + ' '
-                + electricityCodes[2][0] + '</td><td>' + green + ' '
-                + electricityCodes[3][0] + '</td></tr></table>';
-    } else if (type == 'fn_stock_outs') {
-        panelText = '<table><tr><td>(KEY) Stock-outs:</td><td>' + green
-                + ' No</td><td>' + red + ' Yes</td></tr></table>';
-    } else if (type == 'surplus') {
-        panelText = '<table><tr><td>(KEY) Base Vaccine Surplus:</td><td>'
-                + green + ' ' + surplusCodes[0][0] + '</td><td>' + blue + ' '
-                + surplusCodes[1][0] + '</td><td>' + white + ' '
-                + surplusCodes[2][0] + '</td><td>' + yellow + ' '
-                + surplusCodes[3][0] + '</td><td>' + red + ' '
-                + surplusCodes[4][0] + '</td></tr></table>';
-    } else if (type == 'pie') {
-        panelText = '<table><tr><td>(KEY) Vaccine Requirements:</td><td>'
-                + '<img src="images/green_0_100_0.png" width="20px" height="20px"/> >8hrs electricity</td><td>'
-                + '<img src="images/blue_0_100_0.png" width="20px" height="20px"/> <8hrs electricity, gas</td><td>'
-                + '<img src="images/black_0_100_0.png" width="20px" height="20px"/> <8hrs electricity, kerosene</td><td>'
-                + '<img src="images/red_0_100_0.png" width="20px" height="20px"/> None of the above</td><td>'
-                + '</td><td></td><td>'
-                + '<img src="images/green_100_0_0.png" width="20px" height="20px"/> Requirements fully met</td><td>'
-                + '<img src="images/green_0_100_0.png" width="20px" height="20px"/> Requirements fully unmet</td></tr></table>';
-    } else {
-        panelText = 'Whoops!';
+    var panelText = '<table><tr><td>(KEY) ' + userOptions[type].name + ':</td>';
+    var values = userOptions[type].values;
+    for (v in values) {
+        var color = values[v].color;
+        var name = values[v].name;
+        panelText += '<td><img src="images/' + color + '.png" width="15px" height="15px"/> ' + name + '</td>'
     }
+    panelText += '</tr></table>';
 
     $('#footer').html(panelText);
 }
@@ -407,14 +440,16 @@ function addMarker(location, data) {
  * and representing the given information.
  */
 function makeMarker(location, info) {
+    // TODO: how to make markers so they aren't cut off, without using "optimized"
     var marker = new google.maps.Marker({
         position : location,
-        map : map
+        map : map,
+        optimized : false
     });
     marker.info = info;
 
     // Marker starts out displaying electrictiy information
-    setImage(marker, parseInt(info['fi_electricity']), 'fi_electricity');
+    //setImage(marker, parseInt(info['fi_electricity']), 'fi_electricity');
 
     var listener = makeInfoBoxListener(marker);
     google.maps.event.addListener(marker, 'click', listener);
@@ -426,43 +461,29 @@ function makeMarker(location, info) {
  * Set the image of the given marker to represent the given category's value.
  */
 function setImage(marker, value, category) {
+    var attrs = userOptions[category].values[value];
     var imageName;
-    if (category == 'fi_electricity') {
-        value = value >= 0 ? value : 0;
-        if (value < 0 || value > 3)
-            alert(getString(marker.info));
-        imageName = electricityCodes[value][1];
-    } else if (category == 'fi_kerosene') {
-        value = value >= 0 ? value : 4;
-        imageName = keroseneCodes[value][1];
-    } else if (category == 'fi_bottled_gas') {
-        value = value >= 0 ? value : 4;
-        imageName = gasCodes[value][1];
-    } else if (category == 'fn_stock_outs') {
-        value = value >= 0 ? value : 0;
-        imageName = stockOutCodes[value][1];
-    } else if (category == 'surplus') {
-        var val = parseInt(marker.info[selections.schedule]["Surplus"]);
-        val = val >= 0 ? val : 2;
-        imageName = surplusCodes[val][1];
+    if (attrs) {
+        imageName = attrs.color;
     } else {
-        imageName = 'images/white.png';
+        imageName = 'white';
     }
     var zoom = map.getZoom();
     var factor = 40000 / (zoom / 7) / (zoom / 7) / (zoom / 7);
     var scale = marker.info['fi_tot_pop'] / factor;
-    if (!selections.considerPop) {
+    if (!selections.considerSize) {
         scale = (zoom - 7) * 3 + 6;
-    } else if (marker.info['fi_tot_pop'] < factor * ((zoom - 7) * 3 + 3)) {
+    } else if (marker.info[selections.size] < factor * ((zoom - 7) * 3 + 3)) {
         scale = (zoom - 7) * 3 + 3;
-    } else if (marker.info['fi_tot_pop'] > factor * ((zoom - 7) * 8 + 15)) {
+    } else if (marker.info[selections.size] > factor * ((zoom - 7) * 8 + 15)) {
         scale = (zoom - 7) * 8 + 15;
     }
 
+    imageName = 'images/' + imageName + '.png';
     var image = new google.maps.MarkerImage(imageName, new google.maps.Size(
             scale, scale),
-    // The origin for this image is 0,0.
-    new google.maps.Point(0, 0), new google.maps.Point(scale / 2, scale / 2),
+            // The origin for this image is 0,0.
+            new google.maps.Point(0, 0), new google.maps.Point(scale / 2, scale / 2),
             new google.maps.Size(scale, scale));
     marker.setIcon(image);
 }
@@ -561,45 +582,17 @@ function setPie(marker) {
 function makeInfoBoxListener(marker) {
     return function() {
         var info = marker.info;
-        var location = marker.position;
-        var fridges = 'None';
-        if (info.fridges) {
-            fridges = '';
-            for (i in info.fridges) {
-                fridges += info.fridges[i]['ft_model_name'] + ",  ";
-            }
-            fridges = fridges.substring(0, fridges.length - 3);
+        var contentString = '<div id="popup-content"><table>';
+        for (var i = 0; i < userOptions.infoBox.length; i++) {
+            var infoBoxField = userOptions.infoBox[i];
+            var name = userOptions[infoBoxField].name;
+            var infoPoint = info[infoBoxField];
+            var value = userOptions[infoBoxField].values[infoPoint] ?
+                    userOptions[infoBoxField].values[infoPoint].name : infoPoint;
+            contentString += '<tr><td>' + name + '</td><td>' + value + '</td></tr>';
         }
-        var contentString = '<div id="popup-content">'
-                + '<div id="siteDescription">'
-                + info['ft_facility_name']
-                + '</div>'
-                + '<table>'
-                + '<tr><td>Facility type</td><td>'
-                + facilityTypeCodes[parseInt(info['ft_facility_type'])]
-                + '</td></tr>'
-                + '<tr><td>Electricity level</td><td>'
-                + electricityCodes[parseInt(info['fi_electricity'])][0]
-                + '</td></tr>'
-                + '<tr><td>Kerosene</td><td>'
-                + keroseneCodes[parseInt(info['fi_kerosene'])][0]
-                + '</td></tr>'
-                + '<tr><td>Gas</td><td>'
-                + gasCodes[parseInt(info['fi_bottled_gas'])][0]
-                + '</td></tr>'
-                + '<tr><td>Stock-outs</td><td>'
-                + stockOutCodes[parseInt(info['fn_stock_outs'])][0]
-                + '</td></tr>'
-                + '<tr><td>Base Surplus</td><td>'
-                + surplusCodes[parseInt(info['base_schedule']['Surplus'])][0]
-                + '</td></tr>'
-                + '<tr><td>Population</td><td>'
-                + info['fi_tot_pop']
-                + '</td></tr>'
-                + '<tr><td>Fridges</td><td>'
-                + fridges
-                + '</td></tr></table'
-                + '</div>';
+        contentString += '</table></div>';
+        
         infoWindow.content = contentString;
         infoWindow.open(map, marker);
     };

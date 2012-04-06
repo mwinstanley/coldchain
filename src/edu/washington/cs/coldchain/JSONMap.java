@@ -2,6 +2,7 @@ package edu.washington.cs.coldchain;
 
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -48,27 +49,33 @@ public class JSONMap<K, V> extends HashMap<K, V> {
     /**
      * Returns the toString for only the specified subset of keys.
      */
-    public String getString(Set<String> keys) {
-        if (toString == null) {
+    @SuppressWarnings("unchecked")
+    public String getString(List<Field> keys) {
+        //if (toString == null) {
             StringBuilder result = new StringBuilder();
             result.append("\n{ ");
-            Iterator<K> iter = this.keySet().iterator();
-            K key = iter.next();
-            V value = get(key);
-            boolean print = keys.contains(key);
-            String toPrint;
-            if (value instanceof String) {
-                toPrint = "\"" + value + "\"";
-            } else {
-                toPrint = value.toString();
-            }
-            if (print) {
-                result.append("\"" + key + "\": " + toPrint);
-            }
-            while (iter.hasNext()) {
-                key = iter.next();
-                value = get(key);
-                boolean newPrint = keys.contains(key);
+            boolean print = false;
+            double[] utm = null;
+            for (int i = 0; i < keys.size(); i++) {
+                Field f = keys.get(i);
+                V value = get(f.getId());
+                
+                // ASSUMES THAT LAT/LON PAIR ALWAYS GIVEN
+                if (f.getDisplayType().equals("UTMLAT")) {
+                    utm = UTMConverter.parseUTM((String)get(f.getId()), (String)get(keys.get(i+1).getId()), 36, true);
+                    if (utm != null) {
+                        value = (V) String.valueOf(utm[0]);
+                    } else {
+                        value = null;
+                    }
+                } else if (f.getDisplayType().equals("UTMLON")) {
+                    if (utm != null) {
+                        value = (V) String.valueOf(utm[1]);
+                    } else {
+                        value = null;
+                    }
+                }
+                String toPrint;
                 if (value == null) {
                     toPrint = "\"\"";
                 } else if (value instanceof String) {
@@ -76,17 +83,15 @@ public class JSONMap<K, V> extends HashMap<K, V> {
                 } else {
                     toPrint = value.toString();
                 }
-                if (newPrint) {
-                    if (print) {
-                        result.append(", ");
-                    }
-                    result.append("\"" + key + "\": " + toPrint);
-                    print = true;
+                if (print) {
+                    result.append(", ");
                 }
+                result.append("\"" + f.getId() + "\": " + toPrint);
+                print = true;
             }
             result.append(" } ");
-            toString = result.toString();
-        }
-        return toString;
+            return result.toString();
+        //}
+        //return toString;
     }
 }

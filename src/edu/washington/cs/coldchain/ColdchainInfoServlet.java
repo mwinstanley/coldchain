@@ -80,8 +80,10 @@ public class ColdchainInfoServlet extends HttpServlet {
             UserOptions opt = null;
             if (type.equals("f")) {
                 updateOptionsFields(Long.parseLong(id), values, resp.getWriter());
-            } else if (type.equals("v")){
+            } else if (type.equals("v")) {
                 updateOptionsValues(Long.parseLong(id), values, resp.getWriter());
+            } else if (type.equals("s")) {
+                updateOptionsFiles(Long.parseLong(id), values, resp.getWriter());
             }
         }
     }
@@ -96,6 +98,21 @@ public class ColdchainInfoServlet extends HttpServlet {
         String values = req.getParameter("data");
         UserOptions opt = new UserOptions(values);
         update(opt, req, resp);
+    }
+    
+    private void updateOptionsFiles(long id, String values, PrintWriter writer) {
+        PersistenceManager pm = PMF.get().getPersistenceManager();
+        UserOptions options = null;
+        try {
+            options = pm.getObjectById(UserOptions.class, id);
+            pm.deletePersistentAll(options.getFields());
+            options.reviseFiles(values);
+        } finally {
+            pm.close();
+            if (options != null) {
+                writer.print(options.getID());
+            }
+        }
     }
     
     private void updateOptionsFields(long id, String values, PrintWriter writer) {
@@ -115,6 +132,8 @@ public class ColdchainInfoServlet extends HttpServlet {
     
     private void updateOptionsValues(long id, String values, PrintWriter writer) {
         PersistenceManager pm = PMF.get().getPersistenceManager();
+        pm.getFetchPlan().addGroup("fields");
+        pm.getFetchPlan().addGroup("values");
         UserOptions options = null;
         try {
             options = pm.getObjectById(UserOptions.class, id);
@@ -131,6 +150,8 @@ public class ColdchainInfoServlet extends HttpServlet {
     private void update(UserOptions opt, HttpServletRequest req,
                         HttpServletResponse resp) throws IOException {
         PersistenceManager pm = PMF.get().getPersistenceManager();
+        pm.getFetchPlan().addGroup("fields");
+        pm.getFetchPlan().addGroup("values");
         PrintWriter writer = resp.getWriter();
         try {
             pm.makePersistent(opt);

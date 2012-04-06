@@ -1,5 +1,6 @@
 package edu.washington.cs.coldchain;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -30,9 +31,9 @@ public class Facility {
         }
         
         // convert UTM to lat/long if applicable
-        if (features.containsKey("fn_latitude") && features.containsKey("fn_longitude")) {
-            processUTM((String)features.get("fn_latitude"), (String)features.get("fn_longitude"));
-        }
+        //if (features.containsKey("fn_latitude") && features.containsKey("fn_longitude")) {
+        //    processUTM((String)features.get("fn_latitude"), (String)features.get("fn_longitude"));
+        //}
         // set the ID to be the facility ID
         id = values[0];
     }
@@ -132,8 +133,8 @@ public class Facility {
      * @param keys the features of interest
      * @return a JSON-formatted string version of the features and their values
      */
-    public String getString(Set<String> keys) {
-        return ((JSONMap<String, Object>)features).getString(keys);
+    public String getString(List<Field> fields) {
+        return ((JSONMap<String, Object>)features).getString(fields);
     }
     
     /**

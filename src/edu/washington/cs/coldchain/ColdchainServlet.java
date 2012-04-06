@@ -8,10 +8,12 @@ import java.util.Enumeration;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
 import java.util.Set;
 
+import javax.jdo.JDOObjectNotFoundException;
 import javax.jdo.PersistenceManager;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
@@ -46,16 +48,36 @@ public class ColdchainServlet extends HttpServlet {
     public void doGet(HttpServletRequest req, HttpServletResponse resp)
             throws IOException {
         resp.setContentType("text/plain");
-        String fileName = req.getParameter("file");
         String type = req.getParameter("type");
+        long id;
+        try {
+            id = Long.parseLong(req.getParameter("id"));
+        } catch (Exception e) {
+            id = 2454;
+        }
+        
+        PersistenceManager pm = PMF.get().getPersistenceManager();
+        pm.getFetchPlan().addGroup("fields");
+        pm.getFetchPlan().addGroup("values");
+        List<Field> userFields = null;
+        UserOptions opt = null;
+        try {
+            opt = pm.getObjectById(UserOptions.class, id);
+            userFields = opt.getFields();
+        } catch (JDOObjectNotFoundException ex) {
+            
+        } finally {
+            pm.close();
+        }
+        String fileName = opt.getMainFileName();
         Scanner input = new Scanner(new File(fileName));
         if (facilities.isEmpty()) {
             getResponse(input);
         }
         if (type.equals("h")) {
             getKeys(resp.getWriter(), fileName);
-        } else if (type.equals("d")){
-            printFacilities(resp.getWriter());
+        } else if (type.equals("d")) {
+            printFacilities(opt, userFields, resp.getWriter(), id);
         }
     }
     
@@ -68,16 +90,17 @@ public class ColdchainServlet extends HttpServlet {
         }*/
     }
     
-    private void printFacilities(PrintWriter writer) {
+    private void printFacilities(UserOptions opt, List<Field> userFields, PrintWriter writer, long id) {
+        writer.print("{\"options\": " + opt.toString() + ", \"facilities\": ");
         writer.print("[");
         Iterator<Facility> iter = facilities.values().iterator();
-        String obj = iter.next().getString(IMPORTANT_INDICES);
+        String obj = iter.next().getString(userFields);
         writer.print(obj);
         while (iter.hasNext()) {
-            obj = iter.next().getString(IMPORTANT_INDICES);
+            obj = iter.next().getString(userFields);
             writer.print(", " + obj);
         }
-        writer.print("]");
+        writer.print("]}");
     }
     
     private void getResponse(Scanner input) throws IOException {

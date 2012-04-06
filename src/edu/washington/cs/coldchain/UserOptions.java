@@ -12,6 +12,8 @@ import javax.jdo.annotations.PersistenceCapable;
 import javax.jdo.annotations.Persistent;
 import javax.jdo.annotations.PrimaryKey;
 
+import com.google.appengine.api.datastore.Key;
+
 import flexjson.JSONDeserializer;
 import flexjson.JSONSerializer;
 
@@ -23,10 +25,13 @@ import flexjson.JSONSerializer;
  * @author Melissa Winstanley
  */
 @PersistenceCapable(detachable="true")
-@FetchGroup(name="fields", members={@Persistent(name="fields")})
+@FetchGroup(name="fields", members={@Persistent(name="fields"), @Persistent(name="files")})
 public class UserOptions {
     @Persistent
     private List<Field> fields;
+        
+    @Element(dependent="true")
+    private List<FileSummary> files;
     
     /** An ID associated with each unique user option. */
     @PrimaryKey
@@ -44,7 +49,15 @@ public class UserOptions {
      *             and types
      */
     public UserOptions(String data) {
-        reviseOptions(data);
+        reviseFiles(data);
+    }
+    
+    public String getMainFileName() {
+        return files.get(0).name;
+    }
+    
+    public List<FileSummary> getFiles() {
+        return files;
     }
     
     /**
@@ -66,7 +79,7 @@ public class UserOptions {
     @Override
     public String toString() {
         JSONSerializer serializer = new JSONSerializer();
-        return serializer.exclude("*.class").include("fields.values").serialize(this);
+        return serializer.exclude("*.class").include("fields.values").include("files").serialize(this);
         /*
         String result = "";
         for (int i = 0; i < fields.size(); i++) {
@@ -107,6 +120,31 @@ public class UserOptions {
         }
     }
     
+    public void reviseFiles(String values) {
+        List valuesList = (List) new JSONDeserializer().deserialize(values);
+        files = new ArrayList<FileSummary>();
+        FileSummary cur = new FileSummary();
+        cur.type = "main";
+        cur.name = ((Map<String, String>)valuesList.get(0)).get("file");
+        files.add(cur);
+        Map<String, String> valMap = (Map<String, String>)valuesList.get(1);
+        cur = new FileSummary();
+        cur.type = "fridge";
+        cur.name = valMap.get("file");
+        cur.main = valMap.get("joinMain");
+        cur.secondary = valMap.get("joinSecondary");
+        files.add(cur);
+        for (int i = 2; i < valuesList.size(); i++) {
+            valMap = (Map<String, String>)valuesList.get(i);
+            cur = new FileSummary();
+            cur.type="schedule";
+            cur.name = valMap.get("file");
+            cur.main = valMap.get("joinMain");
+            cur.secondary = valMap.get("joinSecondary");
+            files.add(cur);
+        }
+    }
+    
     /**
      * 
      * {"id": "field_id", "displayType": "DISPLAY_TYPE", "values": [{"id": "value_id", "name": "readable_name", "color": "color"}]}
@@ -136,5 +174,33 @@ public class UserOptions {
             s = s.substring(1, s.length() - 1);
         }
         return s;
+    }
+    
+    @PersistenceCapable
+    private static class FileSummary {
+        public String getName() {
+            return name;
+        }
+        public String getType() {
+            return type;
+        }
+        public String getMain() {
+            return main;
+        }
+        public String getSecondary() {
+            return secondary;
+        }
+
+        @Persistent
+        private String name;
+        @Persistent
+        private String type;
+        @Persistent
+        private String main;
+        @Persistent
+        private String secondary;
+        @PrimaryKey       @Persistent(valueStrategy = 
+                IdGeneratorStrategy.IDENTITY) 
+                       private Key id_key;
     }
 }
