@@ -105,8 +105,7 @@ public class ColdchainInfoServlet extends HttpServlet {
         UserOptions options = null;
         try {
             options = pm.getObjectById(UserOptions.class, id);
-            pm.deletePersistentAll(options.getFields());
-            options.reviseFiles(values);
+            options.reviseFiles(values, pm);
         } finally {
             pm.close();
             if (options != null) {
@@ -120,8 +119,7 @@ public class ColdchainInfoServlet extends HttpServlet {
         UserOptions options = null;
         try {
             options = pm.getObjectById(UserOptions.class, id);
-            pm.deletePersistentAll(options.getFields());
-            options.reviseOptions(values);
+            options.reviseOptions(values, pm);
         } finally {
             pm.close();
             if (options != null) {
@@ -137,8 +135,7 @@ public class ColdchainInfoServlet extends HttpServlet {
         UserOptions options = null;
         try {
             options = pm.getObjectById(UserOptions.class, id);
-            options.deleteValues(pm);
-            options.updateValues(values);
+            options.updateValues(values, pm);
         } finally {
             pm.close();
             if (options != null) {

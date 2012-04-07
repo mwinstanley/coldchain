@@ -1,18 +1,18 @@
-<!-- Indices written at Fri, 6 Apr 2012 09:30:38 UTC -->
+<!-- Indices written at Fri, 6 Apr 2012 19:47:02 UTC -->
 
 <datastore-indexes>
 
-    <!-- Used 26 times in query history -->
+    <!-- Used 11 times in query history -->
     <datastore-index kind="Field" ancestor="true" source="auto">
         <property name="fields_INTEGER_IDX" direction="asc"/>
     </datastore-index>
 
-    <!-- Used 134 times in query history -->
+    <!-- Used 91 times in query history -->
     <datastore-index kind="Field$Value" ancestor="true" source="auto">
         <property name="values_INTEGER_IDX" direction="asc"/>
     </datastore-index>
 
-    <!-- Used 22 times in query history -->
+    <!-- Used 11 times in query history -->
     <datastore-index kind="UserOptions$FileSummary" ancestor="true" source="auto">
         <property name="files_INTEGER_IDX" direction="asc"/>
     </datastore-index>

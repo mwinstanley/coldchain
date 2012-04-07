@@ -24,10 +24,13 @@ function requestHeader(userOptions, id) {
         data: 'type=h&' + id,
         success: function(responseText) {
             console.log(userOptions);
+            var parts = responseText.split('\n');
             var options = userOptions ? JSON.parse(userOptions) : null;
             setUpFileTab(options);
-            setUpTable(responseText, options);
+            setUpTable(parts[0], options);
             setUpValueSelectors(options);
+            setUpFridgeTab(parts[1], null);
+            setUpScheduleTab(parts[2], null);
         }
     });
 }
@@ -94,7 +97,38 @@ function setUpFileTab(options) {
     }
     $table.append($tbody);
     $('#files').append($table);
-    var $button = makeSubmitButtonFiles('Submit', false);
+    
+    var $button =  $('<input>', {
+        type: 'button',
+        val: 'Add schedule',
+        name: 'Add schedule',
+        'class': 'btn',
+    });
+    $button.click(function() {
+        $tr = $('<tr>');
+        $('<td>').append('<p>' + fileTypes[2] + '</p>').appendTo($tr);
+        $('<td>').append( $('<input>', {
+            type: 'text',
+            val: '',
+            'class': 'text'
+        })).appendTo($tr);
+        $('<td>').append( $('<input>', {
+            type: 'text',
+            val: '',
+            'class': 'text'
+        })).appendTo($tr);
+        $('<td>').append( $('<input>', {
+            type: 'text',
+            val: '',
+            'class': 'text'
+        })).appendTo($tr);
+
+        $('#files tbody').append($tr);
+    });
+    $('#files').append($button);
+    
+    
+    $button = makeSubmitButtonFiles('Submit', false);
     $('#files').append($button);
     if (options != null) {
         var $buttonUpdate = makeSubmitButtonFiles('Update', true);
@@ -268,6 +302,132 @@ function setUpValueSelectors(options) {
     $('#values').append($table);
     var $button = makeSubmitButtonValues();
     $('#values').append($button);
+}
+
+function setUpFridgeTab(head, options) {
+    var $table = $('<table>');
+    var $thead = $('<thead>');
+    var $tr = $('<tr>');
+    $('<th>').append('Field name').appendTo($tr);
+    $('<th>').append('Rename field').appendTo($tr);
+    $('<th>').append('Include in map?').appendTo($tr);
+    $('<th>').append('Type of field').appendTo($tr);
+    
+    $thead.append($tr);
+    $table.append($thead);
+    
+    var $tbody = $('<tbody>');
+    var header = head.split(',');
+    var fields = options == null ? null : options["fields"];
+    var num = 0;
+    for (var i = 0; i < header.length; i++) {
+        var found = fields != null && num < fields.length && fields[num]["id"] == header[i];
+        $tr = $('<tr>');
+        $('<td>').append('<p>' + header[i] + '</p>').appendTo($tr);
+        $('<td>').append( $('<input>', {
+            type: 'text',
+            val: found ? fields[num]["name"] : header[i],
+            name: header[i],
+            'class': 'text'
+        })).appendTo($tr);
+        var $checkbox =  $('<input>', {
+            type: 'checkbox',
+            val: found ? fields[num]["name"] : header[i],
+            name: header[i],
+            'class': 'check'
+        });
+        if (found) {
+            $checkbox.attr('checked','checked');
+            updateButton = true;
+        }
+        $('<td>').append($checkbox).appendTo($tr);
+        var $select = $('<select>', {
+            name: header[i] + '_type'
+        });
+        var typeOptions = ['Discrete', 'Continuous', 'Unique', 'String'];
+        $.each(typeOptions, function(val, text) {
+            $select.append(
+                    $('<option></option>').val(text.toUpperCase()).html(text)
+            );
+        });
+        $select.val(found ? fields[num]["fieldType"] : 0);
+        $('<td>').append($select).appendTo($tr);
+        $tbody.append($tr);
+        if (found) {
+            num++;
+        }
+    }
+    $table.append($tbody);
+    $('#fridges').append($table);
+   /* var $button = makeSubmitButtonFields('Submit', null);
+    $('#fields').append($button);
+    if (options != null) {
+        var $buttonUpdate = makeSubmitButtonFields('Update', true);
+        $('#fields').append($buttonUpdate);
+    }*/
+}
+
+function setUpScheduleTab(head, options) {
+    var $table = $('<table>');
+    var $thead = $('<thead>');
+    var $tr = $('<tr>');
+    $('<th>').append('Field name').appendTo($tr);
+    $('<th>').append('Rename field').appendTo($tr);
+    $('<th>').append('Include in map?').appendTo($tr);
+    $('<th>').append('Type of field').appendTo($tr);
+    
+    $thead.append($tr);
+    $table.append($thead);
+    
+    var $tbody = $('<tbody>');
+    var header = head.split(',');
+    var fields = options == null ? null : options["fields"];
+    var num = 0;
+    for (var i = 0; i < header.length; i++) {
+        var found = fields != null && num < fields.length && fields[num]["id"] == header[i];
+        $tr = $('<tr>');
+        $('<td>').append('<p>' + header[i] + '</p>').appendTo($tr);
+        $('<td>').append( $('<input>', {
+            type: 'text',
+            val: found ? fields[num]["name"] : header[i],
+            name: header[i],
+            'class': 'text'
+        })).appendTo($tr);
+        var $checkbox =  $('<input>', {
+            type: 'checkbox',
+            val: found ? fields[num]["name"] : header[i],
+            name: header[i],
+            'class': 'check'
+        });
+        if (found) {
+            $checkbox.attr('checked','checked');
+            updateButton = true;
+        }
+        $('<td>').append($checkbox).appendTo($tr);
+        var $select = $('<select>', {
+            name: header[i] + '_type'
+        });
+        var typeOptions = ['Discrete', 'Continuous', 'Unique', 'String'];
+        $.each(typeOptions, function(val, text) {
+            $select.append(
+                    $('<option></option>').val(text.toUpperCase()).html(text)
+            );
+        });
+        $select.val(found ? fields[num]["fieldType"] : 0);
+        $('<td>').append($select).appendTo($tr);
+        $tbody.append($tr);
+        if (found) {
+            num++;
+        }
+    }
+    $table.append($tbody);
+    $('#schedules').append($table);
+   /* var $button = makeSubmitButtonFields('Submit', null);
+    $('#fields').append($button);
+    if (options != null) {
+        var $buttonUpdate = makeSubmitButtonFields('Update', true);
+        $('#fields').append($buttonUpdate);
+    }*/
 }
 
 function makeSubmitButtonFiles(text, id) {

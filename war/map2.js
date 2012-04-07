@@ -215,7 +215,19 @@ function showCategory(category) {
             } else {
                 setImage(marker, marker.info[category], category);
             }
-            marker.setMap(map);
+            var include = true;
+            for (var i = 0; i < userOptions.filter.length; i++) {
+                var curFilter = userOptions.filter[i];
+                include = include && (selections[curFilter] == null ||
+                                      selections[curFilter].length == 0 ||
+                                      marker.info[curFilter] == selections[curFilter]);
+            }
+            if (include) {
+                marker.setMap(map);
+            } else {
+                marker.setMap(null);
+            }
+            
         }
     }
     showKey(category);

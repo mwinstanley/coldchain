@@ -70,19 +70,23 @@ public class ColdchainServlet extends HttpServlet {
             pm.close();
         }
         String fileName = opt.getMainFileName();
-        Scanner input = new Scanner(new File(fileName));
+        String fridgeFile = opt.getFridgeFileName();
+        List<String> scheduleFiles = opt.getScheduleFileNames();
         if (facilities.isEmpty()) {
-            getResponse(input);
+            getResponse(fileName, fridgeFile);
         }
         if (type.equals("h")) {
-            getKeys(resp.getWriter(), fileName);
+            getKeys(resp.getWriter(), fileName, fridgeFile, scheduleFiles);
         } else if (type.equals("d")) {
             printFacilities(opt, userFields, resp.getWriter(), id);
         }
     }
     
-    private void getKeys(PrintWriter writer, String file) throws IOException {
-        writer.print(new Scanner(new File(file)).nextLine());
+    private void getKeys(PrintWriter writer, String mainFile, String fridgeFile, List<String> scheduleFiles) throws IOException {
+        writer.print(new Scanner(new File(mainFile)).nextLine() + "\n" + new Scanner(new File(fridgeFile)).nextLine());
+        for (int i = 0; i < scheduleFiles.size(); i++) {
+            writer.print("\n" + new Scanner(new File(scheduleFiles.get(i))).nextLine());
+        }
         /*Iterator<String> keys = facilities.values().iterator().next().getKeys().iterator();
         writer.print(keys.next());
         while (keys.hasNext()) {
@@ -103,7 +107,8 @@ public class ColdchainServlet extends HttpServlet {
         writer.print("]}");
     }
     
-    private void getResponse(Scanner input) throws IOException {
+    private void getResponse(String mainFile, String fridgeFile) throws IOException {
+        Scanner input = new Scanner(new File(mainFile));
         Scanner baseVol = new Scanner(new File("VaccineVolume_Base.csv"));
         Scanner pcvVol = new Scanner(new File("VaccineVolume_PCV.csv"));
         Scanner rotaVol = new Scanner(new File("VaccineVolume_Rota.csv"));
@@ -121,8 +126,9 @@ public class ColdchainServlet extends HttpServlet {
         }
         
         // add fridges
-        Scanner fridges = new Scanner(new File("TBL_INV_REF.csv"));
+        Scanner fridges = new Scanner(new File(fridgeFile));
         header = fridges.nextLine().split(",");
+        System.out.println(Arrays.toString(header));
         while (fridges.hasNextLine()) {
             String[] line = fridges.nextLine().split(",");
             if (line.length > 0) {

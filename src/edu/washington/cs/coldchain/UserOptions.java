@@ -1,8 +1,10 @@
 package edu.washington.cs.coldchain;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import javax.jdo.PersistenceManager;
 import javax.jdo.annotations.Element;
@@ -25,10 +27,14 @@ import flexjson.JSONSerializer;
  * @author Melissa Winstanley
  */
 @PersistenceCapable(detachable="true")
-@FetchGroup(name="fields", members={@Persistent(name="fields"), @Persistent(name="files")})
+@FetchGroup(name="fields", members={@Persistent(name="fields"),
+        @Persistent(name="fieldNames"), @Persistent(name="files")})
 public class UserOptions {
     @Persistent
     private List<Field> fields;
+    
+    @Persistent
+    private List<String> fieldNames;
         
     @Element(dependent="true")
     private List<FileSummary> files;
@@ -49,11 +55,38 @@ public class UserOptions {
      *             and types
      */
     public UserOptions(String data) {
-        reviseFiles(data);
+        fields = new ArrayList<Field>();
+        fieldNames = new ArrayList<String>();
+        files = new ArrayList<FileSummary>();
+        reviseFiles(data, null);
     }
     
     public String getMainFileName() {
-        return files.get(0).name;
+        if (files.size() > 0) {
+            return files.get(0).name;
+        } else {
+            return null;
+        }
+    }
+    
+    public String getFridgeFileName() {
+        if (files.size() > 1) {
+            return files.get(1).name;
+        } else {
+            return null;
+        }
+    }
+    
+    public List<String> getScheduleFileNames() {
+        if (files.size() > 1) {
+            List<String> res = new ArrayList<String>();
+            for (int i = 2; i < files.size(); i++) {
+                res.add(files.get(i).name);
+            }
+            return res;
+        } else {
+            return null;
+        }
     }
     
     public List<FileSummary> getFiles() {
@@ -98,8 +131,8 @@ public class UserOptions {
      *                   and types
      */
     // MUST BE IN JSON ARRAY OF FIELDS FORMAT
-    public void reviseOptions(String newOptions) {
-        fields = new ArrayList<Field>();
+    public void reviseOptions(String newOptions, PersistenceManager pm) {
+        Set<String> newFields = new HashSet<String>();
         newOptions = newOptions.trim();
         newOptions = newOptions.substring(1, newOptions.length() - 1); // remove brackets
         String[] units = newOptions.split("}");
@@ -108,8 +141,23 @@ public class UserOptions {
             if (u.length() > 0) {
                 u = u.substring(1);
                 String[] attrs = u.split(",");
-                fields.add(new Field(separateJSON(attrs[0]), separateJSON(attrs[1]),
+                String id = separateJSON(attrs[0]);
+                int index = fieldNames.indexOf(id);
+                newFields.add(id);
+                if (index > -1) {
+                    fields.get(index).setFieldType(separateJSON(attrs[2]));
+                    fields.get(index).setName(separateJSON(attrs[1]));
+                } else {
+                    fields.add(new Field(id, separateJSON(attrs[1]),
                                      separateJSON(attrs[2])));
+                    fieldNames.add(id);
+                }
+            }
+        }
+        for (int i = fields.size() - 1; i >= 0; i--) {
+            if (!newFields.contains(fields.get(i).getId())) {
+                pm.deletePersistent(fields.remove(i));
+                fieldNames.remove(i);
             }
         }
     }
@@ -120,20 +168,20 @@ public class UserOptions {
         }
     }
     
-    public void reviseFiles(String values) {
+    public void reviseFiles(String values, PersistenceManager pm) {
         List valuesList = (List) new JSONDeserializer().deserialize(values);
-        files = new ArrayList<FileSummary>();
+        List<FileSummary> newFiles = new ArrayList<FileSummary>();
         FileSummary cur = new FileSummary();
         cur.type = "main";
         cur.name = ((Map<String, String>)valuesList.get(0)).get("file");
-        files.add(cur);
+        newFiles.add(cur);
         Map<String, String> valMap = (Map<String, String>)valuesList.get(1);
         cur = new FileSummary();
         cur.type = "fridge";
         cur.name = valMap.get("file");
         cur.main = valMap.get("joinMain");
         cur.secondary = valMap.get("joinSecondary");
-        files.add(cur);
+        newFiles.add(cur);
         for (int i = 2; i < valuesList.size(); i++) {
             valMap = (Map<String, String>)valuesList.get(i);
             cur = new FileSummary();
@@ -141,7 +189,28 @@ public class UserOptions {
             cur.name = valMap.get("file");
             cur.main = valMap.get("joinMain");
             cur.secondary = valMap.get("joinSecondary");
-            files.add(cur);
+            newFiles.add(cur);
+        }
+        
+        if (files != null) {
+            for (int i = 0; i < Math.min(valuesList.size(), files.size()); i++) {
+                FileSummary orig = files.get(i);
+                FileSummary change = newFiles.get(i);
+                if (orig.getName().equals(change.getName())) {
+                    orig.main = change.main;
+                    orig.secondary = change.secondary;
+                    orig.type = change.type;
+                } else {
+                    pm.deletePersistent(orig);
+                    files.set(i, change);
+                }
+            }
+            for (int i = files.size(); i < newFiles.size(); i++) {
+                files.add(newFiles.get(i));
+            }
+            for (int i = newFiles.size(); i < files.size(); i++) {
+                pm.deletePersistent(files.remove(i));
+            }
         }
     }
     
@@ -151,7 +220,8 @@ public class UserOptions {
      * @param values
      */
     @SuppressWarnings("rawtypes")
-    public void updateValues(String values) {
+    public void updateValues(String values, PersistenceManager pm) {
+        this.deleteValues(pm);
         List valuesMap = (List) new JSONDeserializer().deserialize(values);
         System.out.println(valuesMap.getClass());
         System.out.println(((Map<String, Object>)valuesMap.get(0)).get("id"));
